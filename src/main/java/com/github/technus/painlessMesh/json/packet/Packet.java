@@ -16,7 +16,7 @@ public class Packet extends Type {
     protected long dest;//uint32_t
     protected long from;//uint32_t
 
-    public Optional<Integer> msgType(){
+    public Optional<Integer> msgType() {
         return Optional.empty();
     }
 }

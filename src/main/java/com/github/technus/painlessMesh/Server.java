@@ -26,6 +26,7 @@ import java.util.stream.Collectors;
 public class Server extends Thread {
     @Getter
     protected final long                              nodeId         = 1337_2137;
+    @Getter(AccessLevel.PROTECTED)
     protected final ServerSocket                      serverSocket;
     @Getter
     protected final PacketRegistry<ConnectionHandler> packetRegistry = new PacketRegistry<>();
@@ -54,8 +55,8 @@ public class Server extends Thread {
         getPacketRegistry().registerPacket(TimePacket.TYPE, TimePacket.Request.TYPE, TimePacket.class, TimePacket.Request.class)
                 .setPacketConsumer((app, arrivalTime, packet) -> {
                     @SuppressWarnings("unchecked")
-                    TimePacket<TimePacket.Request>   request = packet;
-                    TimePacket<TimePacket.StartSync> start   = new TimePacket<>();
+                    TimePacket<TimePacket.Request> request = packet;
+                    TimePacket<TimePacket.StartSync> start = new TimePacket<>();
                     start.setFrom(getNodeId());
                     start.setDest(request.getDest());
                     start.setMsg(new TimePacket.StartSync());
@@ -65,7 +66,7 @@ public class Server extends Thread {
         getPacketRegistry().registerPacket(TimePacket.TYPE, TimePacket.StartSync.TYPE, TimePacket.class, TimePacket.StartSync.class)
                 .setPacketConsumer((app, t1, packet) -> {
                     @SuppressWarnings("unchecked")
-                    TimePacket<TimePacket.StartSync>    start    = packet;
+                    TimePacket<TimePacket.StartSync> start = packet;
                     TimePacket<TimePacket.ResponseSync> response = new TimePacket<>();
                     response.setFrom(getNodeId());
                     response.setDest(start.getDest());
@@ -78,11 +79,11 @@ public class Server extends Thread {
         getPacketRegistry().registerPacket(TimePacket.TYPE, TimePacket.ResponseSync.TYPE, TimePacket.class, TimePacket.ResponseSync.class)
                 .setPacketConsumer((app, t3, packet) -> {
                     @SuppressWarnings("unchecked")
-                    TimePacket<TimePacket.ResponseSync> response  = packet;
-                    long                                t0        = response.getMsg().getT0();
-                    long                                t1        = response.getMsg().getT1();
-                    long                                t2        = response.getMsg().getT2();
-                    long                                tripDelay = (t3 - t0) - (t2 - t1);
+                    TimePacket<TimePacket.ResponseSync> response = packet;
+                    long t0        = response.getMsg().getT0();
+                    long t1        = response.getMsg().getT1();
+                    long t2        = response.getMsg().getT2();
+                    long tripDelay = (t3 - t0) - (t2 - t1);
                     if (tripDelay < 50_000) {//50ms
                         app.setTimeOffset((t1 - t0) / 2 + (t2 - t3) / 2);
                     }
@@ -160,9 +161,10 @@ public class Server extends Thread {
                     response.setNoPart(packet.getNoPart());
                     response.setPartNo(packet.getPartNo());
                     response.setForced(packet.isForced());
-                    val ota = otaUpdates.get(new UpdateOTA.ID(packet.getHardware(), packet.getRole(), packet.getMd5(), packet.getNoPart(), packet.isForced()));
+                    val ota = getOtaUpdates().getOrDefault(new UpdateOTA.ID(packet.getHardware(), packet.getRole(), packet.getMd5(), packet.getNoPart(), packet.isForced(), packet.getFrom()),
+                            getOtaUpdates().get(new UpdateOTA.ID(packet.getHardware(), packet.getRole(), packet.getMd5(), packet.getNoPart(), packet.isForced(), null)));
                     if (ota != null && packet.getPartNo() < ota.getChunksCount()) {
-                        response.setData(ota.withData(app.getTimeout(),packet.getPartNo()));
+                        response.setData(ota.withData(app.getTimeout(), packet.getPartNo()));
                     } else {
                         response.setData(Base64.getEncoder().encodeToString(new byte[]{0}));
                     }
@@ -173,9 +175,9 @@ public class Server extends Thread {
     @SneakyThrows
     public void run() {
         while (!Thread.currentThread().isInterrupted()) {
-            new ConnectionHandler(serverSocket.accept()).start();
+            new ConnectionHandler(getServerSocket().accept()).start();
         }
-        serverSocket.close();
+        getServerSocket().close();
     }
 
     public void offerUpdateOTA(UpdateOTA updateOTA) {
@@ -184,19 +186,19 @@ public class Server extends Thread {
 
     public class ConnectionHandler extends Thread {
         @Getter(AccessLevel.PROTECTED)
-        protected final    Socket           clientSocket;
+        protected final    Socket            clientSocket;
         @Getter(AccessLevel.PROTECTED)
-        protected final Thread worker;
+        protected final    Thread            worker;
         @Getter
-        protected          Mesh             mesh       = new Mesh();
+        protected          Mesh              mesh       = new Mesh();
         @Getter
-        protected          long             timeOffset = 0;
+        protected          long              timeOffset = 0;
         @Getter(AccessLevel.PROTECTED)
-        protected volatile Consumer<Packet> packetConsumer;
+        protected volatile Consumer<Packet>  packetConsumer;
         @Getter(AccessLevel.PROTECTED)
-        protected final      Object           lock       = new Object();
+        protected final    Object            lock       = new Object();
         @Getter(AccessLevel.PROTECTED)
-        protected final UpdateOTA.Timeout timeout=new UpdateOTA.Timeout();
+        protected final    UpdateOTA.Timeout timeout    = new UpdateOTA.Timeout();
 
         public ConnectionHandler(Socket socket) {
             this.clientSocket = socket;
@@ -208,10 +210,10 @@ public class Server extends Thread {
                             = false;
                     while (!getWorker().isInterrupted()) {
                         Thread.sleep(10);
-                        long meshTime=getMeshMicroTime();
+                        long meshTime = getMeshMicroTime();
                         if (((meshTime >> 10) & 0x3FF) < 128) {//1s
                             if (!sent) {
-                                System.out.println("BLINK! "+meshTime);
+                                System.out.println("BLINK! " + meshTime);
                                 sent = true;
                             }
                         } else {
@@ -223,7 +225,7 @@ public class Server extends Thread {
                                 if (shouldOffer.get()) {
                                     OTA.Announce announcement = new OTA.Announce();
                                     announcement.setFrom(getNodeId());
-                                    announcement.setDest(getNodeId());//broadcast
+                                    announcement.setDest(id.getTarget().orElse(getNodeId()));//broadcast
                                     announcement.setMd5(id.getMd5());
                                     announcement.setHardware(id.getHardware());
                                     announcement.setRole(id.getRole());

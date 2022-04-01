@@ -12,11 +12,11 @@ import java.util.Optional;
 
 public class JSON<APP> {
     @Getter(AccessLevel.PRIVATE)
-    private static final GsonBuilder    GSON_BUILDER = new GsonBuilder();
+    private static final GsonBuilder         GSON_BUILDER = new GsonBuilder();
     @Getter(AccessLevel.PRIVATE)
-    private final       Gson           gson;
+    private final        Gson                gson;
     @Getter(AccessLevel.PRIVATE)
-    private final       PacketRegistry<APP> packetRegistry;
+    private final        PacketRegistry<APP> packetRegistry;
 
     public JSON(PacketRegistry<APP> packetRegistry) {
         this.packetRegistry = packetRegistry;
@@ -31,8 +31,8 @@ public class JSON<APP> {
 
     @SuppressWarnings("unchecked")
     public <T extends Packet> Optional<T> fromJSON(String json) {
-        Packet                          packet  = getGson().fromJson(json, Packet.class);
-        Optional<PacketHandler<APP,Packet>> handler = getPacketRegistry().getTypeFor(packet);
+        Packet                               packet  = getGson().fromJson(json, Packet.class);
+        Optional<PacketHandler<APP, Packet>> handler = getPacketRegistry().getTypeFor(packet);
         if (handler.isPresent()) {
             packet = getGson().fromJson(json, handler.get().getJsonType());
             Optional<Integer> msgID = packet.msgType();

@@ -12,13 +12,13 @@ public class Main {
 
         PacketRegistry<Server.ConnectionHandler> packetRegistry = server.getPacketRegistry();
 
-        packetRegistry.registerPacket(UserPacket.Broadcast.TYPE,UserPacket.Broadcast.class)
-                .setPacketConsumer((app,arrivalTime,packet) -> System.out.println("Received Broadcast!"));
+        packetRegistry.registerPacket(UserPacket.Broadcast.TYPE, UserPacket.Broadcast.class)
+                .setPacketConsumer((app, arrivalTime, packet) -> System.out.println("Received Broadcast!"));
 
-        packetRegistry.registerPacket(UserPacket.Single.TYPE,UserPacket.Single.class)
-                .setPacketConsumer((app,arrivalTime,packet) -> System.out.println("Received single!"));
+        packetRegistry.registerPacket(UserPacket.Single.TYPE, UserPacket.Single.class)
+                .setPacketConsumer((app, arrivalTime, packet) -> System.out.println("Received single!"));
 
-        server.offerUpdateOTA(new UpdateOTA("ESP32","bridgeAsRoot",
+        server.offerUpdateOTA(new UpdateOTA("ESP32", "bridgeAsRoot",
                 new File("C:\\Users\\danie\\Documents\\PlatformIO\\Projects\\BreachProtocol\\.pio\\build\\bridgeAsRoot\\firmware.bin"))
         );
 

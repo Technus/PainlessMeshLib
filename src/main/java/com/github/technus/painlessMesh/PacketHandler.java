@@ -10,11 +10,12 @@ import java.util.Optional;
 
 @Data
 @Accessors(chain = true)
-public class PacketHandler<APP,T extends Packet> {
-    protected int     packetType;
-    protected Integer msgType;
-    protected Type          jsonType;
-    protected IPacketConsumer<APP,T> packetConsumer = (s,l,p)->{};
+public class PacketHandler<APP, T extends Packet> {
+    protected int                     packetType;
+    protected Integer                 msgType;
+    protected Type                    jsonType;
+    protected IPacketConsumer<APP, T> packetConsumer = (s, l, p) -> {
+    };
 
     public void setPacketMetadata(int packetType, Class<T> clazz, Class<?>... generics) {
         this.packetType = packetType;
@@ -33,10 +34,10 @@ public class PacketHandler<APP,T extends Packet> {
     }
 
     public void onReceive(APP app, long arrivalTime, T packet) {
-        getPacketConsumer().accept(app,arrivalTime,packet);
+        getPacketConsumer().accept(app, arrivalTime, packet);
     }
 
-    public interface IPacketConsumer<APP,T extends Packet>{
-        void accept(APP app,long arrivalTime,T packet);
+    public interface IPacketConsumer<APP, T extends Packet> {
+        void accept(APP app, long arrivalTime, T packet);
     }
 }

@@ -14,17 +14,26 @@ import java.util.stream.IntStream;
 @Accessors(chain = true)
 @RequiredArgsConstructor
 public class UpdateOTA {
-    protected final String hardware;
-    protected final String role;
-    protected final File    file;
-    protected boolean forced =false;
-    protected int partSize=1024;
+    protected final String     hardware;
+    protected final String     role;
+    protected final File       file;
+    protected final boolean    forced     = false;
+    protected final int        partSize   = 1024;
+    protected final Long       target;
     @Getter(lazy = true)
-    private final UpdateData updateData =new UpdateData(getFile());
+    private final   UpdateData updateData = new UpdateData(getFile());
 
-    public String withData(Timeout timeout,int partNo){
+    public UpdateOTA(String hardware, String role, File file) {
+        this(hardware, role, file, null);
+    }
+
+    public String withData(Timeout timeout, int partNo) {
         timeout.setLastUsed(System.currentTimeMillis());
         return getUpdateData().getChunks()[partNo];
+    }
+
+    public Optional<Long> getTarget() {
+        return Optional.ofNullable(target);
     }
 
     public int getChunksCount() {
@@ -64,40 +73,45 @@ public class UpdateOTA {
     @Data
     @AllArgsConstructor
     @Accessors(chain = true)
-    public static class ID{
-        protected final String hardware;
-        protected final String role;
-        protected final String md5;
+    public static class ID {
+        protected final String  hardware;
+        protected final String  role;
+        protected final String  md5;
         protected final int     noPart;
         protected final boolean forced;
+        protected final Long    target;
 
-        public ID(UpdateOTA updateOTA){
-            this(updateOTA.getHardware(), updateOTA.getRole(), updateOTA.getUpdateData().getMd5(),updateOTA.getChunksCount(),updateOTA.isForced());
+        public ID(UpdateOTA updateOTA) {
+            this(updateOTA.getHardware(), updateOTA.getRole(), updateOTA.getUpdateData().getMd5(), updateOTA.getChunksCount(), updateOTA.isForced(), updateOTA.getTarget().orElse(null));
+        }
+
+        public Optional<Long> getTarget() {
+            return Optional.ofNullable(target);
         }
     }
 
     @Data
     @Accessors(chain = true)
-    public static class Timeout{
+    public static class Timeout {
         protected long lastOffer;
         protected long lastUsed;
-        protected int tries=60;//
-        protected int every=60_000;//seconds
+        protected int  tries = 60;//
+        protected int  every = 60_000;//seconds
 
         {
-            lastOffer=lastUsed=System.currentTimeMillis();
+            lastOffer = lastUsed = System.currentTimeMillis();
         }
 
-        public Optional<Boolean> shouldOfferOTA(){
-            if(getTries()==0){
+        public Optional<Boolean> shouldOfferOTA() {
+            if (getTries() == 0) {
                 return Optional.empty();
             }
 
-            long time=System.currentTimeMillis();
+            long time = System.currentTimeMillis();
 
-            if(getTries()>0 && time > getLastOffer() + getEvery()){
-                if(time>getLastUsed()+getEvery()) {
-                    setTries(getTries()-1);
+            if (getTries() > 0 && time > getLastOffer() + getEvery()) {
+                if (time > getLastUsed() + getEvery()) {
+                    setTries(getTries() - 1);
                 }
                 setLastOffer(time);
                 return Optional.of(true);

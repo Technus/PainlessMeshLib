@@ -16,11 +16,11 @@ public abstract class UserPacket extends Packet {
     @Accessors(chain = true)
     @ToString(callSuper = true)
     @EqualsAndHashCode(callSuper = true)
-    public static class Single extends UserPacket{
-        public static final int TYPE=9;
+    public static class Single extends UserPacket {
+        public static final int TYPE = 9;
 
         {
-            type=TYPE;
+            type = TYPE;
         }
     }
 
@@ -28,11 +28,11 @@ public abstract class UserPacket extends Packet {
     @Accessors(chain = true)
     @ToString(callSuper = true)
     @EqualsAndHashCode(callSuper = true)
-    public static class Broadcast extends UserPacket{
-        public static final int TYPE=8;
+    public static class Broadcast extends UserPacket {
+        public static final int TYPE = 8;
 
         {
-            type=TYPE;
+            type = TYPE;
         }
     }
 }

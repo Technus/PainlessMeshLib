@@ -15,16 +15,16 @@ public abstract class OTA extends Packet {
     @Accessors(chain = true)
     @ToString(callSuper = true)
     @EqualsAndHashCode(callSuper = true)
-    public static class Announce extends OTA{
-        public static final int TYPE=10;
-        protected String md5;
-        protected String hardware;
-        protected String  role;
-        protected boolean forced;
-        protected int     noPart;
+    public static class Announce extends OTA {
+        public static final int     TYPE = 10;
+        protected           String  md5;
+        protected           String  hardware;
+        protected           String  role;
+        protected           boolean forced;
+        protected           int     noPart;
 
         {
-            type=TYPE;
+            type = TYPE;
         }
     }
 
@@ -32,12 +32,12 @@ public abstract class OTA extends Packet {
     @Accessors(chain = true)
     @ToString(callSuper = true)
     @EqualsAndHashCode(callSuper = true)
-    public static class DataRequest extends Announce{
-        public static final int TYPE=11;
-        protected int partNo;
+    public static class DataRequest extends Announce {
+        public static final int TYPE = 11;
+        protected           int partNo;
 
         {
-            type=TYPE;
+            type = TYPE;
         }
     }
 
@@ -45,12 +45,12 @@ public abstract class OTA extends Packet {
     @Accessors(chain = true)
     @ToString(callSuper = true)
     @EqualsAndHashCode(callSuper = true)
-    public static class DataResponse extends DataRequest{
-        public static final int TYPE=12;
-        protected String data;
+    public static class DataResponse extends DataRequest {
+        public static final int    TYPE = 12;
+        protected           String data;
 
         {
-            type=TYPE;
+            type = TYPE;
         }
     }
 }
