@@ -12,7 +12,6 @@ import java.util.stream.IntStream;
 
 @Data
 @Accessors(chain = true)
-@RequiredArgsConstructor
 public class UpdateOTA {
     protected final String     hardware;
     protected final String     role;
@@ -23,8 +22,19 @@ public class UpdateOTA {
     @Getter(lazy = true)
     private final   UpdateData updateData = new UpdateData(getFile());
 
+    @Deprecated
+    public UpdateOTA(String hardware, String role, File file, Long target) {
+        this.hardware = hardware;
+        this.role = role;
+        this.file = file;
+        this.target = target;
+    }
+
     public UpdateOTA(String hardware, String role, File file) {
-        this(hardware, role, file, null);
+        this.hardware = hardware;
+        this.role = role;
+        this.file = file;
+        this.target = null;
     }
 
     public String withData(Timeout timeout, int partNo) {
