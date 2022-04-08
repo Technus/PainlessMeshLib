@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
 
 public class Server extends Thread {
     @Getter
-    protected final long                              nodeId         = 1337_2137;
+    protected final long                              nodeId;
     @Getter(AccessLevel.PROTECTED)
     protected final ServerSocket                      serverSocket;
     @Getter
@@ -35,8 +35,8 @@ public class Server extends Thread {
     @Getter
     protected       Map<UpdateOTA.ID, UpdateOTA>      otaUpdates     = new ConcurrentHashMap<>();
 
-    public Server(int port) {
-        this(port, null);
+    public Server(long nodeId, int port) {
+        this(nodeId, port, null);
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             interrupt();
             try {
@@ -48,7 +48,8 @@ public class Server extends Thread {
     }
 
     @SneakyThrows
-    public Server(int port, InetAddress ip) {
+    public Server(long nodeId, int port, InetAddress ip) {
+        this.nodeId = nodeId;
         serverSocket = new ServerSocket(port, 50, ip);
 
         getPacketRegistry().registerPacket(TimePacket.TYPE, TimePacket.class, TimePacket.Msg.class);

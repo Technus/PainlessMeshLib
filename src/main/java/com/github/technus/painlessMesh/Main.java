@@ -8,7 +8,7 @@ import java.io.File;
 public class Main {
     @SneakyThrows
     public static void main(String[] args) {
-        Server server = new Server(5555);
+        Server server = new Server(1337_2138, 5555);
 
         PacketRegistry<Server.ConnectionHandler> packetRegistry = server.getPacketRegistry();
 
