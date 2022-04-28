@@ -2,55 +2,50 @@ package com.github.technus.painlessMesh;
 
 import com.github.technus.painlessMesh.json.JSON;
 import com.github.technus.painlessMesh.json.packet.OTA;
-import com.github.technus.painlessMesh.json.packet.Packet;
 import com.github.technus.painlessMesh.json.packet.RoutingPacket;
 import com.github.technus.painlessMesh.json.packet.TimePacket;
-import com.github.technus.painlessMesh.mesh.Mesh;
 import lombok.*;
+import lombok.experimental.Accessors;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.SocketException;
-import java.nio.charset.StandardCharsets;
+import java.nio.charset.Charset;
 import java.util.Base64;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 public class Server extends Thread {
     @Getter
+    protected Charset charset=Charset.forName("CP1250");
+    @Getter
     protected final long                              nodeId;
     @Getter(AccessLevel.PROTECTED)
     protected final ServerSocket                      serverSocket;
     @Getter
-    protected final PacketRegistry<ConnectionHandler> packetRegistry = new PacketRegistry<>();
+    protected final PacketRegistry<Client>       packetRegistry = new PacketRegistry<>();
     @Getter
-    protected final JSON<ConnectionHandler>           json           = new JSON<>(getPacketRegistry());
+    protected final JSON<Client>                 json=new JSON<>(getPacketRegistry());
     @Getter
-    protected       Map<UpdateOTA.ID, UpdateOTA>      otaUpdates     = new ConcurrentHashMap<>();
+    protected final Map<UpdateOTA.ID, UpdateOTA> otaUpdates = new ConcurrentHashMap<>();
+    @Accessors(chain = true)
+    @Setter
+    protected Consumer<Client> onClientCreated=c->{};
 
-    public Server(long nodeId, int port) {
-        this(nodeId, port, null);
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            interrupt();
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-        }));
+    public Server(long nodeId, int port) throws IOException {
+        this(nodeId,new ServerSocket(port, 50, null));
     }
 
-    @SneakyThrows
-    public Server(long nodeId, int port, InetAddress ip) {
+    public Server(long nodeId, int port, InetAddress ip) throws IOException {
+        this(nodeId,new ServerSocket(port, 50, ip));
+    }
+
+    public Server(long nodeId, ServerSocket serverSocket) {
+        setName("Server");
         this.nodeId = nodeId;
-        serverSocket = new ServerSocket(port, 50, ip);
+        this.serverSocket = serverSocket;
 
         getPacketRegistry().registerPacket(TimePacket.TYPE, TimePacket.class, TimePacket.Msg.class);
         getPacketRegistry().registerPacket(TimePacket.TYPE, TimePacket.Request.TYPE, TimePacket.class, TimePacket.Request.class)
@@ -92,37 +87,37 @@ public class Server extends Thread {
 
         getPacketRegistry().registerPacket(RoutingPacket.Request.TYPE, RoutingPacket.Request.class)
                 .setPacketConsumer((app, arrivalTime, packet) -> {
-                    val packetSubs = new RoutingPacket.Subs();
-                    packetSubs.setNodeId(packet.getNodeId());
-                    packetSubs.setRoot(packet.isRoot());
-                    packetSubs.setSubs(packet.getSubs());
+                    //val packetSubs = new RoutingPacket.Subs();
+                    //packetSubs.setNodeId(packet.getNodeId());
+                    //packetSubs.setRoot(packet.isRoot());
+                    //packetSubs.setSubs(packet.getSubs());
 
-                    if (packetSubs.isRoot()) {
-                        app.getMesh().setRootNode(packetSubs.getNodeId(),
-                                packetSubs.getSubs()
-                                        .stream()
-                                        .map(RoutingPacket.Subs::getNodeId)
-                                        .collect(Collectors.toList()));
-                        packetSubs.getSubs()
-                                .stream()
-                                .flatMap(subs -> subs.getSubs().stream())
-                                .forEach(subs -> app.getMesh().putNode(subs.getNodeId(),
-                                        subs.getSubs()
-                                                .stream()
-                                                .map(RoutingPacket.Subs::getNodeId)
-                                                .collect(Collectors.toList())));
+                    //if (packetSubs.isRoot()) {
+                    //app.getMesh().setRootNode(packetSubs.getNodeId(),
+                    //        packetSubs.getSubs()
+                    //                .stream()
+                    //                .map(RoutingPacket.Subs::getNodeId)
+                    //                .collect(Collectors.toList()));
+                    //packetSubs.getSubs()
+                    //        .stream()
+                    //        .flatMap(subs -> subs.getSubs().stream())
+                    //        .forEach(subs -> app.getMesh().putNode(subs.getNodeId(),
+                    //                subs.getSubs()
+                    //                        .stream()
+                    //                        .map(RoutingPacket.Subs::getNodeId)
+                    //                        .collect(Collectors.toList())));
 
-                        val reply = new RoutingPacket.Reply();
-                        reply.setNodeId(getNodeId());
-                        reply.setFrom(getNodeId());
-                        reply.setDest(packet.getFrom());
-                        reply.setRoot(false);
-                        reply.getSubs().add(packetSubs);
-                        app.send(reply);
+                    val reply = new RoutingPacket.Reply();
+                    reply.setNodeId(getNodeId());
+                    reply.setFrom(getNodeId());
+                    reply.setDest(packet.getFrom());
+                    reply.setRoot(true);
+                    //reply.getSubs().add(packetSubs);
+                    app.send(reply);
 
-                    } else {
-                        throw new RuntimeException("Bridge is not a root");
-                    }
+                    //} else {
+                    //    throw new RuntimeException("Bridge is not a root");
+                    //}
                 });
 
         getPacketRegistry().registerPacket(RoutingPacket.Reply.TYPE, RoutingPacket.Reply.class)
@@ -176,138 +171,15 @@ public class Server extends Thread {
     @SneakyThrows
     public void run() {
         while (!Thread.currentThread().isInterrupted()) {
-            new ConnectionHandler(getServerSocket().accept()).start();
+            val socket=getServerSocket().accept();
+            val client=new Client(getNodeId(),socket,getCharset(),getPacketRegistry(),getJson(),getOtaUpdates());
+            onClientCreated.accept(client);
+            client.start();
         }
         getServerSocket().close();
     }
 
     public void offerUpdateOTA(UpdateOTA updateOTA) {
         getOtaUpdates().put(new UpdateOTA.ID(updateOTA), updateOTA);
-    }
-
-    public class ConnectionHandler extends Thread {
-        @Getter(AccessLevel.PROTECTED)
-        protected final    Socket            clientSocket;
-        @Getter(AccessLevel.PROTECTED)
-        protected final    Thread            worker;
-        @Getter
-        protected          Mesh              mesh       = new Mesh();
-        @Getter
-        protected          long              timeOffset = 0;
-        @Getter(AccessLevel.PROTECTED)
-        protected volatile Consumer<Packet>  packetConsumer;
-        @Getter(AccessLevel.PROTECTED)
-        protected final    Object            lock       = new Object();
-        @Getter(AccessLevel.PROTECTED)
-        protected final    UpdateOTA.Timeout timeout    = new UpdateOTA.Timeout();
-
-        public ConnectionHandler(Socket socket) {
-            this.clientSocket = socket;
-            System.out.println("Connection begin");
-            //1s
-            worker = new Thread(() -> {
-                try {
-                    boolean sent
-                            = false;
-                    while (!getWorker().isInterrupted()) {
-                        Thread.sleep(10);
-                        long meshTime = getMeshMicroTime();
-                        if (((meshTime >> 10) & 0x3FF) < 128) {//1s
-                            if (!sent) {
-                                System.out.println("BLINK! " + meshTime);
-                                sent = true;
-                            }
-                        } else {
-                            sent = false;
-                        }
-                        getOtaUpdates().forEach((id, ota) -> {
-                            Optional<Boolean> shouldOffer = getTimeout().shouldOfferOTA();
-                            if (shouldOffer.isPresent()) {
-                                if (shouldOffer.get()) {
-                                    OTA.Announce announcement = new OTA.Announce();
-                                    announcement.setFrom(getNodeId());
-                                    announcement.setDest(id.getTarget().orElse(getNodeId()));//broadcast
-                                    announcement.setMd5(id.getMd5());
-                                    announcement.setHardware(id.getHardware());
-                                    announcement.setRole(id.getRole());
-                                    announcement.setNoPart(id.getNoPart());
-                                    announcement.setForced(id.isForced());
-                                    send(announcement);
-                                }
-                            } else {
-                                getOtaUpdates().remove(id);
-                            }
-                        });
-                    }
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            });
-            getWorker().start();
-        }
-
-        synchronized public void send(Packet packet) {
-            getPacketConsumer().accept(packet);
-        }
-
-        protected void setTimeOffset(long offsetMicros) {
-            synchronized (getLock()) {
-                timeOffset = offsetMicros;
-            }
-            System.out.println("Time: " + getMeshMicroTime());
-        }
-
-        public long getMeshMicroTime() {
-            synchronized (getLock()) {
-                return (System.nanoTime() / 1000L + getTimeOffset()) & 0xffffffffL;
-            }
-        }
-
-        @SneakyThrows
-        public void run() {
-            try (var out = new BufferedOutputStream(getClientSocket().getOutputStream());
-                 var in = new BufferedInputStream(getClientSocket().getInputStream())) {
-                StringBuilder builder = new StringBuilder();
-                int           nextByte;
-                packetConsumer = packet -> {
-                    byte[] bytes = getJson().toJson(packet).getBytes(StandardCharsets.US_ASCII);
-                    System.out.println(packet);
-                    System.out.println(new String(bytes, StandardCharsets.US_ASCII));
-                    try {
-                        out.write(bytes);
-                        out.write(0);//Null terminator
-                        out.flush();
-                    } catch (IOException e) {
-                        throw new RuntimeException("Failed to send: " + new String(bytes, StandardCharsets.US_ASCII));
-                    }
-                };
-                while (!Server.this.isInterrupted() && (nextByte = in.read()) >= 0) {
-                    if (nextByte == 0) {
-                        long   arrivalTime = getMeshMicroTime();
-                        String inputLine   = builder.toString();
-                        System.out.println(inputLine);
-                        builder.setLength(0);
-
-                        getJson().fromJSON(inputLine)
-                                .ifPresent(packet -> {
-                                    System.out.println(packet);
-                                    getPacketRegistry().getTypeFor(packet)
-                                            .ifPresent(packetPacketHandler -> packetPacketHandler.onReceive(this, arrivalTime, packet));
-                                });
-                    } else {
-                        builder.append((char) nextByte);
-                    }
-                }
-            } catch (SocketException e) {
-                System.err.println("Connection reset");
-            } finally {
-                packetConsumer = packet -> {
-                    byte[] bytes = getJson().toJson(packet).getBytes(StandardCharsets.US_ASCII);
-                    throw new RuntimeException("Cannot send: " + new String(bytes, StandardCharsets.US_ASCII));
-                };
-                getWorker().interrupt();
-                getClientSocket().close();
-            }
-        }
     }
 }
